@@ -1,212 +1,194 @@
-# 📊 电商运营分析平台
+# Ecommerce-Analytics
 
-一个功能强大的电商数据分析和运营优化平台，帮助电商运营人员快速洞察业务数据、优化运营策略。
+电商数据分析平台：Streamlit 仪表板（v1）+ headless CLI（v2）。
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.32.0-red.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+v1 提供 3 个 analyzer（订单 / 产品 / 营销）+ Streamlit 仪表板 + 20 个测试。
+3 个 analyzer 已经是纯 pandas（不依赖 Streamlit），但数据预处理（计算
+`revenue` / `profit` 列）混在 dashboard.py 里，外部脚本想用很别扭。
 
-## ✨ 功能特性
+v2 在不动 v1 任何代码的前提下补：
 
-### 🛍️ 商品分析
-- **销售排名**: 实时查看商品销售 TOP 榜
-- **利润分析**: 多维度利润分析，识别高利润产品
-- **品类表现**: 各品类销售对比，优化品类结构
-- **竞品监控**: 价格对比，市场份额分析
+- **`data_prep.py`** — 把数据预处理抽出来，幂等的纯函数，让 CLI 和外部脚本能复用
+- **`__main__.py`** — 4 子命令 CLI 覆盖 overview / orders / products / marketing
 
-### 📦 订单分析
-- **订单趋势**: 日/周/月订单趋势可视化
-- **地域分布**: 销售地域分布热力图
-- **客户分析**: 客户价值分层，识别 VIP 客户
-- **复购分析**: 复购率统计，客户忠诚度分析
+## v2 新增
 
-### 🎯 营销分析
-- **ROI 分析**: 各营销活动投资回报率
-- **转化漏斗**: 展示→点击→订单转化分析
-- **渠道对比**: 多渠道效果对比
-- **预算建议**: 智能预算分配建议
+| 文件 | 干什么 |
+|---|---|
+| `data_prep.py` | `load_orders` / `prepare_orders`（补 revenue/cost/profit）+ `overview_metrics` KPI |
+| `__main__.py` | CLI 4 子命令 |
+| `tests/test_data_prep.py` | 12 测试：补列幂等 / 空数据 / 实样本加载 |
 
-### ⚠️ 库存管理
-- **库存预警**: 低库存自动预警
-- **补货建议**: 基于销量的智能补货建议
-- **周转分析**: 库存周转率分析
+总测试 32 个（20 v1 + 12 v2），200ms 跑完。
 
-### 💰 价格优化
-- **动态定价**: 基于利润率的定价建议
-- **价格策略**: 差异化价格策略推荐
+## v1 仍保留（已经是纯 pandas）
 
-### 📊 报告导出
-- **运营日报**: 一键生成运营日报
-- **运营周报**: 周期性业务总结
-- **自定义报告**: 支持 Markdown 格式导出
+| 模块 | 干什么 |
+|---|---|
+| `dashboard.py` | Streamlit 交互式主界面 |
+| `order_analyzer.py` | 订单趋势 / 地域 / 城市 / 时段 |
+| `product_analyzer.py` | 品类 / 畅销 / 库存预警 |
+| `marketing_analyzer.py` | ROI / 转化率 / 渠道 |
+| `data/{orders,products,campaigns}.csv` | 示例数据 |
 
-## 🚀 快速开始
-
-### 1. 安装依赖
+## 安装
 
 ```bash
-cd ecommerce-analytics
 pip install -r requirements.txt
 ```
 
-### 2. 运行应用
+## 快速开始
+
+### v2 headless CLI
+
+```bash
+# 整体 KPI
+python __main__.py overview --orders data/orders.csv
+
+# 订单趋势 + 地域分布 + Top 城市
+python __main__.py orders --orders data/orders.csv --period D --top-n 5
+
+# 产品品类 + 畅销 + 库存预警
+python __main__.py products --orders data/orders.csv \
+    --products data/products.csv --top-n 5
+
+# 营销 ROI + 转化率 + 渠道
+python __main__.py marketing --orders data/orders.csv \
+    --campaigns data/campaigns.csv
+
+# 所有命令都支持 -o report.json 导出
+python __main__.py overview --orders data/orders.csv -o kpi.json
+```
+
+### v1 Streamlit 仪表板
 
 ```bash
 streamlit run dashboard.py
 ```
 
-### 3. 访问应用
+### 库调用
 
-浏览器打开：http://localhost:8501
+```python
+from data_prep import load_orders, load_products, load_campaigns, overview_metrics
+from order_analyzer import OrderAnalyzer
+from product_analyzer import ProductAnalyzer
+from marketing_analyzer import MarketingAnalyzer
 
-## 📁 项目结构
+orders = load_orders("data/orders.csv")      # 自动补 revenue/profit
+products = load_products("data/products.csv")
+campaigns = load_campaigns("data/campaigns.csv")
 
-```
-ecommerce-analytics/
-├── dashboard.py              # 主界面
-├── product_analyzer.py       # 商品分析模块
-├── order_analyzer.py         # 订单分析模块
-├── marketing_analyzer.py     # 营销分析模块
-├── requirements.txt          # 依赖列表
-├── README.md                 # 项目说明
-├── data/                     # 数据目录
-│   ├── orders.csv           # 订单数据
-│   ├── products.csv         # 产品数据
-│   └── campaigns.csv        # 营销活动数据
-└── tests/                    # 测试目录
-    └── test_analyzers.py    # 单元测试
-```
+# 整体 KPI
+print(overview_metrics(orders))
+# {'n_orders': 50, 'total_revenue': 11538.0, 'total_profit': 5527.0,
+#  'profit_margin_pct': 47.9, 'avg_order_value': 230.76,
+#  'unique_customers': 43}
 
-## 📊 数据格式
+# 详细分析
+oa = OrderAnalyzer(orders)
+print(oa.get_regional_distribution())
 
-### 订单数据 (orders.csv)
-```csv
-order_id,customer_id,customer_name,product_id,product_name,category,quantity,unit_price,cost_price,order_date,region,city,payment_method,status
-ORD001,C001，张三，P001，无线鼠标，电子产品，2,89.00,45.00,2024-01-01，华东，上海，支付宝，已完成
-```
+pa = ProductAnalyzer(orders, products)
+print(pa.get_top_sellers(top_n=5))
 
-### 产品数据 (products.csv)
-```csv
-product_id,product_name,category,supplier,cost_price,sell_price,stock_quantity,reorder_level,last_restock_date
-P001，无线鼠标，电子产品，供应商 A,45.00,89.00,150,50,2024-01-01
+ma = MarketingAnalyzer(campaigns, orders)
+print(ma.get_campaign_roi())
 ```
 
-### 营销活动数据 (campaigns.csv)
-```csv
-campaign_id,campaign_name,start_date,end_date,channel,budget,orders,revenue,impressions,clicks
-CMP001，新年促销，2024-01-01,2024-01-07，全渠道，5000.00,85,12500.00,150000,8500
+## 真实输出例子
+
+```
+$ python __main__.py overview --orders data/orders.csv
+
+{
+  "n_orders": 50,
+  "total_revenue": 11538.0,
+  "total_profit": 5527.0,
+  "profit_margin_pct": 47.9,
+  "avg_order_value": 230.76,
+  "unique_customers": 43
+}
 ```
 
-## 🧪 运行测试
+## 数据 schema
+
+### orders.csv（必需）
+| 列 | 必需 |
+|---|---|
+| order_id | 否 |
+| customer_id | 否（影响 unique_customers）|
+| product_id | 否 |
+| category | 否 |
+| quantity | **是** |
+| unit_price | **是** |
+| cost_price | 否（影响 profit 计算）|
+| order_date | **是** |
+| region | 否 |
+| city | 否 |
+
+`revenue` = `quantity * unit_price`；`cost` = `quantity * cost_price`；
+`profit` = `revenue - cost`。已存在则不覆盖（幂等）。
+
+### products.csv（可选）
+| 列 | 用途 |
+|---|---|
+| product_id / product_name | 关联订单 |
+| category / supplier | 分类统计 |
+| stock_quantity / reorder_level | 低库存告警 |
+
+### campaigns.csv（用于 marketing 命令）
+| 列 | 用途 |
+|---|---|
+| campaign_id / campaign_name | 标识 |
+| channel | 渠道分类 |
+| budget / revenue | ROI 计算 |
+| impressions / clicks / orders | 转化率 |
+
+## 设计取舍
+
+- **`prepare_orders` 幂等**：CSV 里已经有 `revenue` 列时不覆盖（用户可能预先算
+  好了或想用自己的口径）。
+- **CLI 命令独立、不复用全局状态**：每个子命令各自 `load_orders` 一遍，避免
+  CSV 改动时缓存不一致。
+- **products 命令可选 `--products` CSV**：没传时只算品类 / 畅销，不算低库存。
+- **DataFrame → JSON**：日期列统一转 `YYYY-MM-DD` 字符串，让输出 JSON 干净。
+
+## 项目结构
+
+```
+Ecommerce-Analytics/
+├── __main__.py                  # v2 CLI
+├── data_prep.py                 # v2 数据预处理
+├── dashboard.py                 # v1 Streamlit
+├── order_analyzer.py            # v1 订单分析
+├── product_analyzer.py          # v1 产品分析
+├── marketing_analyzer.py        # v1 营销分析
+├── tests/                       # 32 测试
+│   ├── test_analyzers.py        # v1
+│   └── test_data_prep.py        # v2 新增
+├── data/{orders,products,campaigns}.csv
+├── start.bat
+└── requirements.txt
+```
+
+## 测试
 
 ```bash
-# 运行所有测试
-pytest tests/ -v
-
-# 运行测试并生成覆盖率报告
-pytest tests/ -v --cov=. --cov-report=html
-
-# 查看覆盖率报告
-open htmlcov/index.html  # macOS/Linux
-start htmlcov\index.html  # Windows
+pytest tests/ --no-cov
 ```
 
-## 💡 使用技巧
+32 个测试，200ms 跑完。
 
-### 1. 使用示例数据快速体验
-- 启动应用后默认加载示例数据
-- 包含 50 条订单、29 款产品、5 个营销活动
+## 已知限制
 
-### 2. 上传自定义数据
-- 在侧边栏选择"上传自定义数据"
-- 按照数据格式要求上传 CSV 文件
-- 支持实时数据更新
+- 没有 LLM commentary 层 —— ecommerce 场景非常依赖具体业务上下文（行业 /
+  品类 / 季节），通用 LLM 给的洞察容易偏假大空，本仓库不强行加。需要的话
+  可以参考 Sales-Dashboard 的 `llm_commentary.py` 模式自己接。
+- 没有时间序列预测 —— 单独的事情，参考 Quant-Strategy-Backtester / Sales-Dashboard
+  的 `forecast.py`。
+- `product_analyzer.get_low_stock_products` 需要 products.csv 含 `stock_quantity`
+  和 `reorder_level` 列；缺时该报告字段为空。
 
-### 3. 导出分析报告
-- 进入"报告导出"模块
-- 选择日报或周报
-- 点击下载按钮获取 Markdown 格式报告
+## 许可
 
-### 4. 库存预警设置
-- 在"库存预警"模块查看低库存商品
-- 系统自动计算日均销量和补货建议
-- 支持导出补货清单
-
-## 📈 核心指标说明
-
-| 指标 | 说明 | 计算公式 |
-|------|------|----------|
-| ROI | 投资回报率 | (营收 - 预算) / 预算 × 100% |
-| CTR | 点击率 | 点击量 / 展示量 × 100% |
-| CVR | 转化率 | 订单量 / 点击量 × 100% |
-| 客单价 | 平均订单价值 | 总营收 / 订单数 |
-| 复购率 | 重复购买客户占比 | 复购客户数 / 总客户数 × 100% |
-| 毛利率 | 利润占营收比例 | 利润 / 营收 × 100% |
-| 库存周转率 | 库存销售速度 | 销量 / 库存 × 100% |
-
-## 🔧 自定义配置
-
-### 修改主题颜色
-编辑 `dashboard.py` 中的 Plotly 颜色配置：
-```python
-color_discrete_sequence=px.colors.qualitative.Set3
-```
-
-### 添加新的分析维度
-在对应的 analyzer 模块中添加新方法：
-```python
-def get_custom_analysis(self):
-    # 自定义分析逻辑
-    pass
-```
-
-### 调整预警阈值
-在 `product_analyzer.py` 中修改库存预警逻辑：
-```python
-if row['stock_quantity'] <= row['reorder_level']:
-    return "立即补货"
-```
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-## 📝 更新日志
-
-### v1.0.0 (2024-01)
-- ✨ 初始版本发布
-- 🎯 商品分析、订单分析、营销分析核心功能
-- 📊 交互式数据可视化
-- 📥 报告导出功能
-- 🧪 完整单元测试覆盖
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 👨‍💻 技术栈
-
-- **前端**: Streamlit
-- **数据处理**: Pandas, NumPy
-- **可视化**: Plotly
-- **机器学习**: Scikit-learn (价格优化建议)
-- **测试**: Pytest
-
-## 🙏 致谢
-
-感谢以下开源项目：
-- [Streamlit](https://streamlit.io/)
-- [Plotly](https://plotly.com/)
-- [Pandas](https://pandas.pydata.org/)
-
----
-
-**Made with ❤️ by 电商运营分析团队**
-
-如有问题或建议，欢迎联系！
+MIT
