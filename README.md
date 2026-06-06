@@ -1,5 +1,8 @@
 # Ecommerce-Analytics
 
+> 归档说明：本仓库的 headless CLI、订单/产品/营销分析和电商 KPI 能力已被
+> [revenue-iq](https://github.com/gaaiyun/revenue-iq) 吸收并继续维护。本仓库保留为历史快照。
+
 电商数据分析平台：Streamlit 仪表板（v1）+ headless CLI（v2）。
 
 v1 提供 3 个 analyzer（订单 / 产品 / 营销）+ Streamlit 仪表板 + 20 个测试。
